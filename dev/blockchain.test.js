@@ -29,4 +29,5 @@ currentBlockData = [
 // bitcoin.createNewTransactions(40, "32395sdjsmirse", "43ruweri8249ui");
 
 //console.log(bitcoin.proofOfWork(previousBlockHash, currentBlockData));
-console.log(bitcoin.hashBlock(previousBlockHash, currentBlockData, 52773));
+//console.log(bitcoin.hashBlock(previousBlockHash, currentBlockData, 52773));
+console.log(bitcoin);

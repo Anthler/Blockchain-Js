@@ -3,7 +3,6 @@ const sha = require("sha256");
 function Blockchain() {
   this.chain = [];
   this.pendingTransactions = [];
-  this.createNewBlock(100, "o", "o");
 
   Blockchain.prototype.createNewBlock = function(
     nonce,
@@ -23,11 +22,14 @@ function Blockchain() {
         Therefore, we want to clear out the entire new transactions
          array so that we can start over for the next block.
         */
+
     this.pendingTransactions = [];
 
     this.chain.push(newBlock);
     return newBlock;
   };
+
+  this.createNewBlock(100, "0", "1");
 
   Blockchain.prototype.getLastBlock = function() {
     return this.chain[this.chain.length - 1];
@@ -74,7 +76,8 @@ function Blockchain() {
     while (hash.substring(0, 4) !== "0000") {
       nonce++;
       hash = this.hashBlock(previousBlockHash, currentBlockData, nonce);
-      console.log(hash);
+
+      //console.log(hash);
     }
 
     return nonce;
