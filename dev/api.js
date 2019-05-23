@@ -1,3 +1,5 @@
+const port = process.argv[2];
+
 const express = require("express");
 const bodyParser = require("body-parser");
 const Blockchain = require("./blockchain");
@@ -53,6 +55,19 @@ app.get("/mine", (req, res) => {
   });
 });
 
-app.listen(3000, () => {
-  console.log("SERVER RUNNING ON PORT: 3000");
+app.post("/register-and-broadcast-node", (req, res) => {
+  const newNodeUrl = request.body.newNodeUrl;
+  bitcoin.networkNodes.push(newNodeUrl);
+});
+
+app.post("/register-node", (req, res) => {
+  const newNodeUrl = request.body.newNodeUrl;
+});
+
+app.post("/register-nodes-bulk", (req, res) => {
+  const newNodeUrl = request.body.newNodeUrl;
+});
+
+app.listen(port, () => {
+  console.log(`SERVER RUNNING ON PORT: ${port}`);
 });
