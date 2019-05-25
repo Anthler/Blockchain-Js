@@ -4,6 +4,7 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const Blockchain = require("./blockchain");
 const uuid = require("uuid/v1");
+const rp = require("request-promise");
 
 const nodeAddress = uuid()
   .split("-")
@@ -57,7 +58,46 @@ app.get("/mine", (req, res) => {
 
 app.post("/register-and-broadcast-node", (req, res) => {
   const newNodeUrl = request.body.newNodeUrl;
-  bitcoin.networkNodes.push(newNodeUrl);
+  const requestOptions = {
+    uri: networkNodeUrl + "/register-node",
+    method: "POST",
+    body: { newNodeUrl: newNodeUrl },
+    json: true
+  };
+
+  rp(requestOptions);
+  if (bitcoin.networkNodes.indexOf(newNodeUrl) == -1) {
+    bitcoin.networkNodes.push(newNodeUrl);
+  }
+
+  const regNodePromises = [];
+  bitcoin.networkNodes.forEach(networkNodeUrl => {
+    const requestOptions = {
+      uri: networkNodeUrl + "/transaction",
+      method: "POST",
+      body: newTransaction,
+      json: true
+    };
+
+    regNodePromises.push(rp(requestOptions));
+
+    Promise.all(regNodePromises)
+      .then(() => {
+        const registerBulkOptions = {
+          uri: newNodeUrl + "/register-nodes-bulk",
+          method: "POST",
+          body: {
+            allNetworkNode: [...bitcoin.networkNodes, bitcoin.currentNodeUrl]
+          },
+          json: true
+        };
+
+        rp(registerBulkOptions);
+      })
+      .then(data => {
+        res.json({ note: "New node registered with network successfully" });
+      });
+  });
 });
 
 app.post("/register-node", (req, res) => {
