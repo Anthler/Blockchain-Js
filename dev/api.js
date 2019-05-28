@@ -5,6 +5,7 @@ const bodyParser = require("body-parser");
 const Blockchain = require("./blockchain");
 const uuid = require("uuid/v1");
 const rp = require("request-promise");
+const request = require("request");
 
 const nodeAddress = uuid()
   .split("-")
@@ -24,14 +25,11 @@ app.get("/blockchain", (req, res) => {
 });
 
 app.post("/transaction", (req, res) => {
-  const blockIndex = bitcoin.createNewTransactions(
-    req.body.amount,
-    req.body.sender,
-    req.body.recipient
+  const newTransaction = req.body;
+  const blockIndex = bitcoin.addTransactionToPendingTransactions(
+    newTransaction
   );
-  res.json({
-    note: `Transaction will be added at block number ${blockIndex}.`
-  });
+  res.json(`Your transaction will be added at block number ${blockIndex}`);
 });
 
 app.get("/mine", (req, res) => {
@@ -57,15 +55,8 @@ app.get("/mine", (req, res) => {
 });
 
 app.post("/register-and-broadcast-node", (req, res) => {
-  const newNodeUrl = request.body.newNodeUrl;
-  const requestOptions = {
-    uri: networkNodeUrl + "/register-node",
-    method: "POST",
-    body: { newNodeUrl: newNodeUrl },
-    json: true
-  };
+  const newNodeUrl = req.body.newNodeUrl;
 
-  rp(requestOptions);
   if (bitcoin.networkNodes.indexOf(newNodeUrl) == -1) {
     bitcoin.networkNodes.push(newNodeUrl);
   }
@@ -73,39 +64,107 @@ app.post("/register-and-broadcast-node", (req, res) => {
   const regNodePromises = [];
   bitcoin.networkNodes.forEach(networkNodeUrl => {
     const requestOptions = {
-      uri: networkNodeUrl + "/transaction",
+      uri: networkNodeUrl + "/register-node",
       method: "POST",
-      body: newTransaction,
+      body: { newNodeUrl: newNodeUrl },
       json: true
     };
 
-    regNodePromises.push(rp(requestOptions));
-
-    Promise.all(regNodePromises)
-      .then(() => {
-        const registerBulkOptions = {
-          uri: newNodeUrl + "/register-nodes-bulk",
-          method: "POST",
-          body: {
-            allNetworkNode: [...bitcoin.networkNodes, bitcoin.currentNodeUrl]
-          },
-          json: true
-        };
-
-        rp(registerBulkOptions);
-      })
-      .then(data => {
-        res.json({ note: "New node registered with network successfully" });
-      });
+    regNodePromises.push(
+      rp(requestOptions)
+        .then(data => {
+          console.log("good");
+        })
+        .catch(err => {
+          console.log(err);
+        })
+    );
   });
+
+  Promise.all(regNodePromises)
+    .then(data => {
+      const registerBulkOptions = {
+        uri: newNodeUrl + "/register-nodes-bulk",
+        method: "POST",
+        body: {
+          allNetworkNode: [...bitcoin.networkNodes, bitcoin.currentNodeUrl]
+        },
+        json: true
+      };
+
+      return rp(registerBulkOptions)
+        .then(data => {
+          console.log("good");
+        })
+        .catch(err => {
+          console.log(err);
+        });
+    })
+    .then(data => {
+      res.json({ note: "New node registered with network successfully" });
+    })
+    .catch(err => {
+      console.log(err);
+    });
 });
 
 app.post("/register-node", (req, res) => {
   const newNodeUrl = request.body.newNodeUrl;
+  const nodeNotAlreadyExists = bitcoin.networkNodes.indexOf(newNodeUrl) == -1;
+  const notCurrentNode = bitcoin.currentNodeUrl !== newNodeUrl;
+  if (nodeNotAlreadyExists && notCurrentNode) {
+    bitcoin.networkNodes.push(newNodeUrl);
+  }
+  res.json({ note: "New node registered successfully" });
 });
 
 app.post("/register-nodes-bulk", (req, res) => {
-  const newNodeUrl = request.body.newNodeUrl;
+  const allNetworkNodes = req.body.allNetworkNodes;
+  allNetworkNodes.forEach(networkNodeUrl => {
+    const nodeNotAlreadyPresent =
+      bitcoin.networkNodes.indexOf(networkNodeUrl) == -1;
+
+    const notCurrentNode = bitcoin.currentNodeUrl !== networkNodeUrl;
+
+    if (nodeNotAlreadyPresent && notCurrentNode) {
+      bitcoin.networkNodes.push(networkNodeUrl);
+    }
+  });
+
+  res.json({ note: "Bulk registration successful." });
+});
+
+app.post("/transaction/broadcast", (req, res) => {
+  const newTransaction = bitcoin.createNewTransactions(
+    req.body.amount,
+    req.body.sender,
+    req.body.recipient
+  );
+  bitcoin.addTransactionToPendingTransactions(newTransaction);
+  bitcoin.networkNodes.forEach(networkNodeUrl => {
+    const requestOptions = {
+      uri: networkNodeUrl,
+      method: "POST",
+      body: newTransaction,
+      json: true
+    };
+    const requestPromises = [];
+    requestPromises.push(
+      rp(requestOptions)
+        .then(data => {})
+        .catch(err => {
+          console.log("there was a problem");
+        })
+    );
+  });
+
+  Promise.all(requestPromises)
+    .then(data => {
+      res.json({ Note: "Transaction creted and broadcasted successfully" });
+    })
+    .catch(err => {
+      console.log("There is an issue");
+    });
 });
 
 app.listen(port, () => {
